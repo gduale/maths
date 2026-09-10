@@ -7,9 +7,10 @@ Application Django et Tailwind CSS pour pratiquer les quatre opérations, tables
 ```sh
 uv venv --python 3.14 .venv
 uv pip install --python .venv/bin/python -r requirements.txt
-.venv/bin/python manage.py migrate
-.venv/bin/python manage.py runserver
+./start-dev.sh
 ```
+
+Pour les démarrages suivants, lance simplement `./start-dev.sh`. Le script applique les migrations puis démarre le serveur sur localhost avec rechargement automatique. Arrête-le avec Ctrl+C.
 
 Ouvrir http://127.0.0.1:8000. Créer un profil puis choisir une opération et une table.
 Les profils sont liés au navigateur par sa session ; utiliser le même navigateur pour retrouver les profils. Pas de compte ni de synchronisation entre appareils.
