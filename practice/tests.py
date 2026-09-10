@@ -14,6 +14,8 @@ class ExerciseGenerationTests(TestCase):
                     questions = generate_questions(operation, table)
                     self.assertEqual(len(questions), 10)
                     self.assertEqual(len({(q['left'], q['right'], q['result'], q['hole']) for q in questions}), 10)
+                    for position in ('left', 'right', 'result'):
+                        self.assertIn(sum(q['hole'] == position for q in questions), (3, 4))
                     for question in questions:
                         left, right, result = (question[key] for key in ('left', 'right', 'result'))
                         calculated = {'addition': lambda: left + right, 'soustraction': lambda: left - right, 'multiplication': lambda: left * right, 'division': lambda: left / right}[operation]()
@@ -77,3 +79,18 @@ class JourneyTests(TestCase):
             self.assertEqual(self.client.get(reverse('tables', args=[operation])).status_code, 200)
         self.assertContains(self.client.get('/'), 'Camille')
         self.assertEqual(self.client.get('/historique/').status_code, 200)
+
+    def test_missing_result_is_rendered_and_checked_for_each_operation(self):
+        for operation in OPERATIONS:
+            with self.subTest(operation=operation):
+                questions = generate_questions(operation, 9)
+                questions.sort(key=lambda question: question['hole'] != 'result')
+                attempt = Attempt.objects.create(profile=self.profile, operation=operation, table=9, questions=questions)
+                url = reverse('exercise', args=[attempt.pk])
+                response = self.client.get(url)
+                self.assertContains(response, '<span>=</span><input aria-label="Nombre manquant"')
+                self.assertContains(response, 'name="answer"', count=1)
+                response = self.client.post(url, {'index': 0, 'answer': questions[0]['result']}, follow=True)
+                self.assertContains(response, 'Bien joué')
+                attempt.refresh_from_db()
+                self.assertEqual(attempt.score, 1)

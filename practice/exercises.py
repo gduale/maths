@@ -4,7 +4,8 @@ OPERATIONS = {"addition": ("Addition", "+", "On rassemble les nombres", "peach")
 
 def generate_questions(operation, table):
     questions = []
-    swapped_positions = set(random.sample(range(10), 5))
+    holes = ["left", "right", "result"] * 3 + [random.choice(["left", "right", "result"])]
+    random.shuffle(holes)
     for index, number in enumerate(random.sample(range(1, 11), 10)):
         if operation == "addition":
             left, right, result = number, table, number + table
@@ -14,17 +15,11 @@ def generate_questions(operation, table):
             left, right, result = number, table, number * table
         else:
             left, right, result = number * table, table, number
-        # Keep the selected table visible: addition/subtraction train +/- table.
-        # Commutative operations allow the missing term on either side.
-        if operation in ("addition", "multiplication") and index in swapped_positions:
+        hole = holes[index]
+        # Keep the selected table visible in commutative missing-term questions.
+        if operation in ("addition", "multiplication") and hole == "right":
             left, right = right, left
-            hole = "right"
-        else:
-            hole = "left"
-        questions.append({"left": left, "right": right, "result": result, "hole": hole, "answer": left if hole == "left" else right})
-    # In subtraction/division, alternate the position while retaining the table relationship.
-    if operation in ("soustraction", "division"):
-        for question in random.sample(questions, 5):
-            question["hole"] = "right"
-            question["answer"] = question["right"]
+        question = {"left": left, "right": right, "result": result, "hole": hole}
+        question["answer"] = question[hole]
+        questions.append(question)
     return questions
