@@ -2,23 +2,25 @@ from datetime import timedelta
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
-from .exercises import OPERATIONS, generate_questions
+from .exercises import CATEGORIES, CATEGORY_OPERATIONS, OPERATIONS, generate_questions
 from .models import Attempt, Profile
 
 
 class ExerciseGenerationTests(TestCase):
     def test_all_tables_have_ten_distinct_valid_questions(self):
-        for operation in OPERATIONS:
+        for operation in CATEGORIES:
             for table in range(2, 10):
                 for _ in range(20):
                     questions = generate_questions(operation, table)
                     self.assertEqual(len(questions), 10)
-                    self.assertEqual(len({(q['left'], q['right'], q['result'], q['hole']) for q in questions}), 10)
+                    self.assertEqual(len({(q['operation'], q['left'], q['right'], q['result'], q['hole']) for q in questions}), 10)
+                    for member in CATEGORY_OPERATIONS[operation]:
+                        self.assertEqual(sum(q['operation'] == member for q in questions), 5)
                     for position in ('left', 'right', 'result'):
                         self.assertIn(sum(q['hole'] == position for q in questions), (3, 4))
                     for question in questions:
                         left, right, result = (question[key] for key in ('left', 'right', 'result'))
-                        calculated = {'addition': lambda: left + right, 'soustraction': lambda: left - right, 'multiplication': lambda: left * right, 'division': lambda: left / right}[operation]()
+                        calculated = {'addition': lambda: left + right, 'soustraction': lambda: left - right, 'multiplication': lambda: left * right, 'division': lambda: left / right}[question['operation']]()
                         self.assertEqual(calculated, result)
                         self.assertEqual(question['answer'], question[question['hole']])
                         self.assertGreaterEqual(question['answer'], 0)
@@ -31,7 +33,7 @@ class JourneyTests(TestCase):
         self.profile = Profile.objects.get()
 
     def start_attempt(self):
-        response = self.client.post(reverse('start', args=['addition', 2]))
+        response = self.client.post(reverse('start', args=['add_sub', 2]))
         self.assertEqual(response.status_code, 302)
         return Attempt.objects.latest('pk')
 
@@ -75,13 +77,13 @@ class JourneyTests(TestCase):
         self.assertRedirects(Client().post('/demarrer/addition/2/'), '/')
 
     def test_all_pages_render(self):
-        for operation in OPERATIONS:
+        for operation in CATEGORIES:
             self.assertEqual(self.client.get(reverse('tables', args=[operation])).status_code, 200)
         self.assertContains(self.client.get('/'), 'Camille')
         self.assertEqual(self.client.get('/historique/').status_code, 200)
 
     def test_missing_result_is_rendered_and_checked_for_each_operation(self):
-        for operation in OPERATIONS:
+        for operation in CATEGORIES:
             with self.subTest(operation=operation):
                 questions = generate_questions(operation, 9)
                 questions.sort(key=lambda question: question['hole'] != 'result')
@@ -94,3 +96,24 @@ class JourneyTests(TestCase):
                 self.assertContains(response, 'Bien joué')
                 attempt.refresh_from_db()
                 self.assertEqual(attempt.score, 1)
+
+    def test_mixed_questions_show_their_own_operator(self):
+        for category in CATEGORIES:
+            self.client.post(reverse('start', args=[category, 3]))
+            attempt = Attempt.objects.latest('pk')
+            self.assertEqual(attempt.operation, category)
+            url = reverse('exercise', args=[attempt.pk])
+            for index, question in enumerate(attempt.questions):
+                response = self.client.get(url)
+                self.assertContains(response, f"<span>{OPERATIONS[question['operation']][1]}</span>")
+                response = self.client.post(url, {'index': index, 'answer': question['answer']}, follow=True)
+                self.assertContains(response, 'Bien joué')
+            self.assertContains(self.client.get(reverse('history')), CATEGORIES[category][0])
+
+    def test_legacy_attempt_remains_readable_and_replays_as_mixed(self):
+        question = {'left': 2, 'right': 3, 'result': 5, 'hole': 'result', 'answer': 5}
+        attempt = Attempt.objects.create(profile=self.profile, operation='addition', table=2, questions=[question] * 10)
+        response = self.client.get(reverse('exercise', args=[attempt.pk]))
+        self.assertContains(response, '<span>+</span>')
+        self.client.post(reverse('start', args=['addition', 2]))
+        self.assertEqual(Attempt.objects.latest('pk').operation, 'add_sub')

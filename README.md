@@ -1,6 +1,6 @@
 # Les petits génies
 
-Application Django et Tailwind CSS pour pratiquer les quatre opérations, tables de 2 à 9.
+Application Django et Tailwind CSS pour pratiquer deux catégories : addition et soustraction, multiplication et division, tables de 2 à 9. Chaque nouvelle série mélange aléatoirement cinq questions de chaque opération.
 
 ## Démarrer
 
@@ -12,7 +12,7 @@ uv pip install --python .venv/bin/python -r requirements.txt
 
 Pour les démarrages suivants, lance simplement `./start-dev.sh`. Le script applique les migrations puis démarre le serveur sur localhost avec rechargement automatique. Arrête-le avec Ctrl+C.
 
-Ouvrir http://127.0.0.1:8000. Créer un profil puis choisir une opération et une table.
+Ouvrir http://127.0.0.1:8000. Créer un profil puis choisir une catégorie et une table.
 Les profils sont liés au navigateur par sa session ; utiliser le même navigateur pour retrouver les profils. Pas de compte ni de synchronisation entre appareils.
 
 Dix calculs distincts par session, correction côté serveur et protection contre les doubles validations. Le chronométrage commence à la création de la série et se termine à la dixième réponse (pauses comprises). Les durées sont uniquement visibles dans l’historique.

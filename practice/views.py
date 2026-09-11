@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from .models import AVATARS, Attempt, Profile
-from .exercises import OPERATIONS, generate_questions
+from .exercises import CATEGORIES, OPERATIONS, category_for, operation_details, generate_questions
 
 def owner(request):
     if "owner" not in request.session:
@@ -15,7 +15,7 @@ def owner(request):
 
 def home(request):
     profiles = Profile.objects.filter(owner=owner(request))
-    return render(request, "practice/home.html", {"profiles": profiles, "avatars": AVATARS, "operations": OPERATIONS.items(), "selected": request.session.get("profile")})
+    return render(request, "practice/home.html", {"profiles": profiles, "avatars": AVATARS, "operations": CATEGORIES.items(), "selected": request.session.get("profile")})
 
 @require_POST
 def create_profile(request):
@@ -33,13 +33,15 @@ def select_profile(request, pk):
     return redirect("home")
 
 def tables(request, operation):
-    if operation not in OPERATIONS:
+    operation = category_for(operation)
+    if operation not in CATEGORIES:
         raise Http404
-    return render(request, "practice/tables.html", {"operation": operation, "details": OPERATIONS[operation], "tables": range(2, 10)})
+    return render(request, "practice/tables.html", {"operation": operation, "details": CATEGORIES[operation], "tables": range(2, 10)})
 
 @require_POST
 def start(request, operation, table):
-    if operation not in OPERATIONS or table not in range(2, 10):
+    operation = category_for(operation)
+    if operation not in CATEGORIES or table not in range(2, 10):
         raise Http404
     profile = Profile.objects.filter(pk=request.session.get("profile"), owner=owner(request)).first()
     if not profile:
@@ -69,7 +71,7 @@ def exercise(request, pk):
             return render(request, "practice/result.html", {"attempt": attempt})
         index = len(attempt.answers) - 1 if feedback else len(attempt.answers)
         question = attempt.questions[index]
-        return render(request, "practice/exercise.html", {"attempt": attempt, "question": question, "index": index, "number": index + 1, "progress": (index + 1) * 10, "details": OPERATIONS[attempt.operation], "feedback": feedback, "last_answer": attempt.answers[-1] if feedback else None, "digits": "1234567890"})
+        return render(request, "practice/exercise.html", {"attempt": attempt, "question": question, "index": index, "number": index + 1, "progress": (index + 1) * 10, "details": operation_details(attempt.operation), "symbol": OPERATIONS[question.get("operation", attempt.operation)][1], "feedback": feedback, "last_answer": attempt.answers[-1] if feedback else None, "digits": "1234567890"})
 
 def history(request):
     attempts = Attempt.objects.filter(profile__owner=owner(request), finished_at__isnull=False).select_related("profile").order_by("-finished_at")[:100]

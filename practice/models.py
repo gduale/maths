@@ -20,3 +20,8 @@ class Attempt(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     score = models.PositiveSmallIntegerField(default=0)
+
+    @property
+    def operation_label(self):
+        from .exercises import operation_details
+        return operation_details(self.operation)[0]
