@@ -37,6 +37,29 @@ class JourneyTests(TestCase):
         self.assertEqual(response.status_code, 302)
         return Attempt.objects.latest('pk')
 
+    def test_change_avatar_preserves_profile_selection_and_attempts(self):
+        attempt = self.start_attempt()
+        self.client.post(reverse('create_profile'), {'name': 'Alex', 'avatar': 'cat'})
+        selected = self.client.session['profile']
+        response = self.client.post(reverse('update_avatar', args=[self.profile.pk]), {'avatar': 'panda'}, follow=True)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.avatar, 'panda')
+        self.assertEqual(self.profile.first_name, 'Camille')
+        self.assertEqual(self.client.session['profile'], selected)
+        self.assertEqual(Attempt.objects.get(pk=attempt.pk).profile_id, self.profile.pk)
+        self.assertContains(response, 'L’icône du profil a été modifiée')
+        self.assertContains(response, 'value="panda" checked')
+
+    def test_change_avatar_rejects_invalid_values_and_other_owners(self):
+        url = reverse('update_avatar', args=[self.profile.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertEqual(Client().post(url, {'avatar': 'panda'}).status_code, 404)
+        for data in ({}, {'avatar': 'invalid'}):
+            response = self.client.post(url, data, follow=True)
+            self.assertContains(response, 'Choisis une icône parmi les compagnons proposés.')
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.avatar, 'fox')
+
     def test_complete_series_saves_score_and_server_duration(self):
         attempt = self.start_attempt()
         Attempt.objects.filter(pk=attempt.pk).update(started_at=timezone.now() - timedelta(seconds=42))

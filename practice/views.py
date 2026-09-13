@@ -27,6 +27,18 @@ def create_profile(request):
     return redirect("home")
 
 @require_POST
+def update_avatar(request, pk):
+    profile = get_object_or_404(Profile, pk=pk, owner=owner(request))
+    avatar = request.POST.get("avatar")
+    if avatar in dict(AVATARS):
+        profile.avatar = avatar
+        profile.save(update_fields=["avatar"])
+        messages.success(request, "L’icône du profil a été modifiée !")
+    else:
+        messages.error(request, "Choisis une icône parmi les compagnons proposés.")
+    return redirect("home")
+
+@require_POST
 def select_profile(request, pk):
     profile = get_object_or_404(Profile, pk=pk, owner=owner(request))
     request.session["profile"] = profile.pk

@@ -1,3 +1,5 @@
+document.querySelectorAll('[data-open-dialog]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.openDialog).showModal()));
+document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 const dialog = document.querySelector('#profile-dialog');
 document.querySelector('[data-open-profile]')?.addEventListener('click', () => dialog.showModal());
 document.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close());
