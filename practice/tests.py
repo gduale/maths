@@ -1,4 +1,5 @@
 from datetime import timedelta
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -29,6 +30,8 @@ class ExerciseGenerationTests(TestCase):
 
 class JourneyTests(TestCase):
     def setUp(self):
+        self.user = get_user_model().objects.create_user(username='player', password='test-password')
+        self.client.force_login(self.user)
         self.client.post(reverse('create_profile'), {'name': 'Camille', 'avatar': 'fox'})
         self.profile = Profile.objects.get()
 
@@ -53,7 +56,9 @@ class JourneyTests(TestCase):
     def test_change_avatar_rejects_invalid_values_and_other_owners(self):
         url = reverse('update_avatar', args=[self.profile.pk])
         self.assertEqual(self.client.get(url).status_code, 405)
-        self.assertEqual(Client().post(url, {'avatar': 'panda'}).status_code, 404)
+        other = Client()
+        other.force_login(self.user)
+        self.assertEqual(other.post(url, {'avatar': 'panda'}).status_code, 404)
         for data in ({}, {'avatar': 'invalid'}):
             response = self.client.post(url, data, follow=True)
             self.assertContains(response, 'Choisis une icône parmi les compagnons proposés.')
@@ -90,6 +95,7 @@ class JourneyTests(TestCase):
     def test_profiles_and_attempts_are_private_to_browser(self):
         attempt = self.start_attempt()
         other = Client()
+        other.force_login(self.user)
         self.assertEqual(list(other.get('/').context['profiles']), [])
         self.assertEqual(other.get(reverse('exercise', args=[attempt.pk])).status_code, 404)
         self.assertEqual(other.post(reverse('select_profile', args=[self.profile.pk])).status_code, 404)
@@ -97,7 +103,9 @@ class JourneyTests(TestCase):
     def test_invalid_routes_and_missing_profile(self):
         self.assertEqual(self.client.get('/tables/invalid/').status_code, 404)
         self.assertEqual(self.client.post('/demarrer/addition/12/').status_code, 404)
-        self.assertRedirects(Client().post('/demarrer/addition/2/'), '/')
+        other = Client()
+        other.force_login(self.user)
+        self.assertRedirects(other.post('/demarrer/addition/2/'), '/')
 
     def test_all_pages_render(self):
         for operation in CATEGORIES:
@@ -140,3 +148,70 @@ class JourneyTests(TestCase):
         self.assertContains(response, '<span>+</span>')
         self.client.post(reverse('start', args=['addition', 2]))
         self.assertEqual(Attempt.objects.latest('pk').operation, 'add_sub')
+
+
+class AuthenticationTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username='player', password='test-password',
+        )
+
+    def test_anonymous_requests_are_protected_without_side_effects(self):
+        urls = ['/', '/historique/', '/tables/add_sub/', '/exercice/1/',
+                '/profils/creer/', '/profils/1/', '/profils/1/icone/',
+                '/demarrer/add_sub/2/']
+        for url in urls:
+            for method in (self.client.get, self.client.post):
+                with self.subTest(url=url, method=method.__name__):
+                    response = method(url)
+                    self.assertRedirects(response, f'/connexion/?next={url}')
+        self.assertFalse(Profile.objects.exists())
+        self.assertFalse(Attempt.objects.exists())
+        self.assertNotIn('owner', self.client.session)
+
+    def test_login_page_has_only_login_form(self):
+        response = self.client.get('/', follow=True)
+        self.assertTemplateUsed(response, 'practice/login.html')
+        self.assertContains(response, 'name="username"')
+        self.assertContains(response, 'name="password"')
+        self.assertNotContains(response, 'Les petits progrès')
+        self.assertNotContains(response, 'name="email"')
+
+    def test_valid_login_opens_application_and_preserves_session(self):
+        session = self.client.session
+        session['owner'] = 'existing-browser'
+        session.save()
+        response = self.client.post(reverse('login'), {
+            'username': 'player', 'password': 'test-password',
+        })
+        self.assertRedirects(response, '/')
+        self.assertEqual(self.client.session['_auth_user_id'], str(self.user.pk))
+        self.assertEqual(self.client.session['owner'], 'existing-browser')
+        self.assertRedirects(self.client.get(reverse('login')), '/')
+
+    def test_invalid_and_inactive_accounts_are_rejected(self):
+        for active, password in ((True, 'wrong-password'), (False, 'test-password')):
+            self.user.is_active = active
+            self.user.save()
+            response = self.client.post(reverse('login'), {
+                'username': 'player', 'password': password,
+            })
+            self.assertContains(response, 'Identifiant ou mot de passe incorrect')
+            self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_login_returns_to_requested_page_but_rejects_external_redirects(self):
+        for destination, expected in (('/historique/', '/historique/'),
+                                      ('https://example.com/', '/')):
+            client = Client()
+            response = client.post(reverse('login'), {
+                'username': 'player', 'password': 'test-password', 'next': destination,
+            })
+            self.assertRedirects(response, expected)
+
+    def test_login_requires_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+        response = client.post(reverse('login'), {
+            'username': 'player', 'password': 'test-password',
+        })
+        self.assertEqual(response.status_code, 403)

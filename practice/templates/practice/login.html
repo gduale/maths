@@ -1,0 +1,25 @@
+{% extends 'practice/base.html' %}
+{% block title %}Connexion · Les petits génies{% endblock %}
+{% block content %}
+<section class="login-card" aria-labelledby="login-title">
+  <div class="section-kicker">BIENVENUE CHEZ LES PETITS GÉNIES</div>
+  <h1 id="login-title">À toi de jouer !</h1>
+  <p>Connecte-toi pour accéder aux activités.</p>
+  {% if form.errors %}
+  <div class="feedback incorrect" role="alert">Identifiant ou mot de passe incorrect. Réessaie.</div>
+  {% endif %}
+  <form method="post" action="{% url 'login' %}" class="grid gap-5">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div>
+      <label for="id_username">Identifiant</label>
+      <input id="id_username" name="username" type="text" value="{{ form.username.value|default_if_none:'' }}" maxlength="150" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    </div>
+    <div>
+      <label for="id_password">Mot de passe</label>
+      <input id="id_password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="primary" type="submit">Se connecter →</button>
+  </form>
+</section>
+{% endblock %}

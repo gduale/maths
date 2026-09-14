@@ -46,6 +46,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -130,3 +131,6 @@ MAILERS = {
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 365
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
