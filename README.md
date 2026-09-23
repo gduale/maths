@@ -36,6 +36,16 @@ pnpm run build:css
 
 Le CSS compilé est versionné et fonctionne sans service externe.
 
+## Fichiers statiques en production
+
+Après chaque déploiement, collecter les images, le CSS et le JavaScript :
+
+```sh
+.venv/bin/python manage.py collectstatic --noinput
+```
+
+Les fichiers sont rassemblés dans le dossier `staticfiles/` à la racine du projet (`STATIC_ROOT`), distinct du dossier source `static/`. Configurer le serveur web de production pour servir les URL `/static/` depuis ce dossier. Avec `DEBUG=False`, Django ne sert pas lui-même ces fichiers.
+
 ## Vérification
 
 ```sh
