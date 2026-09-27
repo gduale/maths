@@ -30,8 +30,6 @@ class ExerciseGenerationTests(TestCase):
 
 class JourneyTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username='player', password='test-password')
-        self.client.force_login(self.user)
         self.client.post(reverse('create_profile'), {'name': 'Camille', 'avatar': 'fox'})
         self.profile = Profile.objects.get()
 
@@ -57,7 +55,6 @@ class JourneyTests(TestCase):
         url = reverse('update_avatar', args=[self.profile.pk])
         self.assertEqual(self.client.get(url).status_code, 405)
         other = Client()
-        other.force_login(self.user)
         self.assertEqual(other.post(url, {'avatar': 'panda'}).status_code, 404)
         for data in ({}, {'avatar': 'invalid'}):
             response = self.client.post(url, data, follow=True)
@@ -95,7 +92,6 @@ class JourneyTests(TestCase):
     def test_profiles_and_attempts_are_private_to_browser(self):
         attempt = self.start_attempt()
         other = Client()
-        other.force_login(self.user)
         self.assertEqual(list(other.get('/').context['profiles']), [])
         self.assertEqual(other.get(reverse('exercise', args=[attempt.pk])).status_code, 404)
         self.assertEqual(other.post(reverse('select_profile', args=[self.profile.pk])).status_code, 404)
@@ -104,7 +100,6 @@ class JourneyTests(TestCase):
         self.assertEqual(self.client.get('/tables/invalid/').status_code, 404)
         self.assertEqual(self.client.post('/demarrer/addition/12/').status_code, 404)
         other = Client()
-        other.force_login(self.user)
         self.assertRedirects(other.post('/demarrer/addition/2/'), '/')
 
     def test_all_pages_render(self):
@@ -157,25 +152,21 @@ class AuthenticationTests(TestCase):
             username='player', password='test-password',
         )
 
-    def test_anonymous_requests_are_protected_without_side_effects(self):
-        urls = ['/', '/historique/', '/tables/add_sub/', '/exercice/1/',
-                '/profils/creer/', '/profils/1/', '/profils/1/icone/',
-                '/demarrer/add_sub/2/']
-        for url in urls:
-            for method in (self.client.get, self.client.post):
-                with self.subTest(url=url, method=method.__name__):
-                    response = method(url)
-                    self.assertRedirects(response, f'/connexion/?next={url}')
-        self.assertFalse(Profile.objects.exists())
-        self.assertFalse(Attempt.objects.exists())
-        self.assertNotIn('owner', self.client.session)
+    def test_application_is_accessible_without_login(self):
+        for url in ('/', '/historique/', '/tables/add_sub/'):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertContains(self.client.get('/'), 'Les petits progrès')
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_admin_still_requires_login(self):
+        self.assertRedirects(self.client.get('/admin/'), '/admin/login/?next=/admin/')
 
     def test_login_page_has_only_login_form(self):
-        response = self.client.get('/', follow=True)
+        response = self.client.get(reverse('login'))
         self.assertTemplateUsed(response, 'practice/login.html')
         self.assertContains(response, 'name="username"')
         self.assertContains(response, 'name="password"')
-        self.assertNotContains(response, 'Les petits progrès')
         self.assertNotContains(response, 'name="email"')
 
     def test_valid_login_opens_application_and_preserves_session(self):

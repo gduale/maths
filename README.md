@@ -12,7 +12,7 @@ uv pip install --python .venv/bin/python -r requirements.txt
 
 Pour les démarrages suivants, lance simplement `./start-dev.sh`. Le script applique les migrations puis démarre le serveur sur localhost avec rechargement automatique. Arrête-le avec Ctrl+C.
 
-Ouvrir http://127.0.0.1:8000 et se connecter avec un compte Django actif, puis créer un profil et choisir une catégorie et une table. Toutes les pages de l’application nécessitent une connexion, y compris les accès directs aux exercices et à l’historique.
+Ouvrir http://127.0.0.1:8000, créer un profil et choisir une catégorie et une table. L’application est accessible sans connexion, y compris les exercices et l’historique.
 
 Pour créer le premier compte administrateur :
 
@@ -20,7 +20,7 @@ Pour créer le premier compte administrateur :
 .venv/bin/python manage.py createsuperuser
 ```
 
-Les autres comptes peuvent être créés dans `/admin/` (Utilisateurs). Un compte actif ordinaire suffit pour utiliser l’application. Aucun envoi d’e-mail, inscription publique ou formulaire de réinitialisation de mot de passe n’est proposé.
+L’administration `/admin/` reste protégée par une connexion Django avec les droits nécessaires. Aucun compte n’est requis pour jouer.
 
 Les profils restent liés au navigateur par sa session ; utiliser le même navigateur pour les retrouver. Ils ne sont pas synchronisés entre appareils.
 
