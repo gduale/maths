@@ -2,6 +2,20 @@ from django.db import models
 
 AVATARS = [("fox", "🦊"), ("cat", "🐱"), ("panda", "🐼"), ("frog", "🐸"), ("rabbit", "🐰"), ("lion", "🦁")]
 
+class UsageCounter(models.Model):
+    answered_questions = models.PositiveBigIntegerField("réponses validées", default=0)
+    completed_series = models.PositiveBigIntegerField("séries terminées", default=0)
+
+    class Meta:
+        verbose_name = "compteur d’utilisation"
+        verbose_name_plural = "compteurs d’utilisation"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(pk=1), name="usage_counter_singleton"),
+        ]
+
+    def __str__(self):
+        return "Utilisation totale de l’application"
+
 class Profile(models.Model):
     owner = models.CharField(max_length=64, db_index=True)
     first_name = models.CharField(max_length=30)

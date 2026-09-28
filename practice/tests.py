@@ -206,3 +206,62 @@ class AuthenticationTests(TestCase):
             'username': 'player', 'password': 'test-password',
         })
         self.assertEqual(response.status_code, 403)
+
+
+class UsageCounterTests(TestCase):
+    def setUp(self):
+        from .models import UsageCounter
+        self.counter = UsageCounter.objects.get(pk=1)
+        self.client.post(reverse('create_profile'), {'name': 'Camille', 'avatar': 'fox'})
+        self.client.post(reverse('start', args=['add_sub', 2]))
+        self.attempt = Attempt.objects.get()
+        self.url = reverse('exercise', args=[self.attempt.pk])
+
+    def assert_counts(self, questions, series):
+        self.counter.refresh_from_db()
+        self.assertEqual(self.counter.answered_questions, questions)
+        self.assertEqual(self.counter.completed_series, series)
+
+    def test_counts_answers_and_completion_once(self):
+        self.client.get(self.url)
+        self.client.post(self.url, {'index': 0, 'answer': '-1'})
+        self.assertEqual(Client().post(self.url, {'index': 0, 'answer': '999'}).status_code, 404)
+        self.assert_counts(0, 0)
+        for index in range(10):
+            data = {'index': index, 'answer': '999'}
+            self.client.post(self.url, data)
+            self.client.post(self.url, data)
+            self.client.get(self.url)
+            self.assert_counts(index + 1, int(index == 9))
+        Profile.objects.all().delete()
+        self.assert_counts(10, 1)
+
+    def test_admin_displays_read_only_counter(self):
+        user = get_user_model().objects.create_superuser('admin', password='test-password')
+        self.client.force_login(user)
+        url = reverse('admin:practice_usagecounter_changelist')
+        response = self.client.get(url)
+        self.assertContains(response, 'Utilisation totale de l’application')
+        self.assertContains(response, 'Réponses validées')
+        self.assertContains(response, 'Séries terminées')
+        detail = reverse('admin:practice_usagecounter_change', args=[1])
+        self.assertEqual(self.client.get(detail).status_code, 200)
+        self.assertEqual(self.client.post(detail, {'answered_questions': 999}).status_code, 403)
+        self.assertEqual(self.client.post(reverse('admin:practice_usagecounter_add')).status_code, 403)
+        self.assertEqual(self.client.post(reverse('admin:practice_usagecounter_delete', args=[1])).status_code, 403)
+        self.assert_counts(0, 0)
+
+    def test_existing_history_initializes_counter(self):
+        from importlib import import_module
+        from django.apps import apps
+        from django.db import connection
+        self.attempt.answers = [{'value': 999, 'correct': False}] * 10
+        self.attempt.finished_at = timezone.now()
+        self.attempt.save()
+        Attempt.objects.create(
+            profile=self.attempt.profile, operation='add_sub', table=2,
+            questions=self.attempt.questions, answers=[{'value': 999, 'correct': False}],
+        )
+        migration = import_module('practice.migrations.0003_initialize_usage_counter')
+        migration.initialize_counter(apps, connection.schema_editor())
+        self.assert_counts(11, 1)

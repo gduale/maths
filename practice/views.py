@@ -1,11 +1,12 @@
 import uuid
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import F
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from .models import AVATARS, Attempt, Profile
+from .models import AVATARS, Attempt, Profile, UsageCounter
 from .exercises import CATEGORIES, OPERATIONS, category_for, operation_details, generate_questions
 
 def owner(request):
@@ -77,6 +78,11 @@ def exercise(request, pk):
                     attempt.finished_at = timezone.now()
                     attempt.duration_seconds = round((attempt.finished_at - attempt.started_at).total_seconds())
                 attempt.save()
+                UsageCounter.objects.get_or_create(pk=1)
+                UsageCounter.objects.filter(pk=1).update(
+                    answered_questions=F("answered_questions") + 1,
+                    completed_series=F("completed_series") + int(attempt.finished_at is not None),
+                )
                 return redirect(f"/exercice/{pk}/?feedback=1")
         feedback = request.GET.get("feedback") == "1" and bool(attempt.answers)
         if attempt.finished_at and not feedback:
